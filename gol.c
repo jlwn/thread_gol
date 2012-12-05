@@ -14,7 +14,7 @@ void verifyCmdArgs(int argc, char *argv[]);
 int numNeighbors(int xcoord, int ycoord, int rows, int cols, char *board,
                  int numcoords);
 char *copyBoard(char *board, int rows, int cols);
-void evolve(int x, int y, int rows, int cols, char *newBoard, char *oldBoard,
+void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard, 
     char *argv[], int numCoords, int iters);
 FILE *openFile(char *filename[]);
 
@@ -74,7 +74,7 @@ void print(char* arr, int willPrint, int rows, int cols, int iters) {
     return;
   }
   
-  usleep(50000);
+  usleep(1000000);
   system("clear");
   printf("Iteration %d:\n\n",iters); 
   int i;
@@ -131,19 +131,19 @@ int numNeighbors(int xCoord, int yCoord, int rows, int cols, char *board,
   neighborCounter = 0;
   
   // Locates the current row and determines if it has wrapped
-  for(j = -1; j < 2; j++){
+  for(j = -1; j< 2; j++){
     int currentRow;
     currentRow = x+j;
     if(currentRow == rows){
       currentRow = 0;  	  
-    }else if(currentRow == -1){
+    }else if(currentRow ==-1){
       currentRow = rows-1;
     }
     
     // Locates the current column and determines if it has wrapped
-    for(k = -1; k < 2; k++){
+    for(k = -1;k<2;k++){
       int currentCol;
-      currentCol = y+k;
+      currentCol = y +k;
       if(currentCol == cols){
           currentCol = 0;
       }else if(currentCol == -1){
@@ -158,7 +158,7 @@ int numNeighbors(int xCoord, int yCoord, int rows, int cols, char *board,
       }
     }
   }
-
+  //printf("neighborCounter: %d\n",neighborCounter);
   return neighborCounter;
 }
 
@@ -185,7 +185,7 @@ char *copyBoard(char *board, int rows, int cols) {
   return newBoard;
 }
 
-void evolve(int x, int y, int rows, int cols, char *newBoard, char *oldBoard,
+void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard,
     char *argv[], int numCoords, int iters) {
   /*
    * Purpose: Examines the board and applies the rules of the Game of Life
@@ -198,16 +198,12 @@ void evolve(int x, int y, int rows, int cols, char *newBoard, char *oldBoard,
    * Returns: Nothing
    */ 
   
-  // TODO: Instead of using this stupid set of nested for loops
-  //       we will use two char * boards and will "swap" (by way
-  //       of an intermediary pointer) the addresses of the boards
-  //       to update the new and old boards.
   //char *newBoard = copyBoard(board, rows, cols);
   
-  // Update both boards in here
   for(x = 0; x < rows; x++) {
     for(y = 0; y < cols; y++) {
-      int neighbors = numNeighbors(x, y, rows, cols, newBoard, numCoords);
+      int neighbors = numNeighbors(x, y, rows, cols, refBoard, numCoords);
+      //printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
       if (neighbors < 0 || neighbors > 8) {
         printf("Invalid number of neighbors. Should be between 0 and 8");
         exit(1);
@@ -220,11 +216,14 @@ void evolve(int x, int y, int rows, int cols, char *newBoard, char *oldBoard,
 
       } else if(neighbors == 3){
           newBoard[x*rows+y] = '@';
-        }
+      
+      } else {
+          newBoard[x*rows+y] = refBoard[x*rows+y];
+      }
+        
     }
   }
-
-  print(newBoard,atoi(argv[2]),rows,cols,iters);
+    print(newBoard,atoi(argv[2]),rows,cols,iters);
 }
 
 FILE *openFile(char *filename[]) {
@@ -249,9 +248,9 @@ int main(int argc, char *argv[]) {
   FILE *inFile = openFile(argv);
   struct timeval start, end;
   char *newBoard = NULL;
-  char *oldBoard = NULL;
+  char *refBoard = NULL;
   char *temp = NULL;
-  
+
   // Process command line arguments
   verifyCmdArgs(argc, argv);
 
@@ -260,14 +259,17 @@ int main(int argc, char *argv[]) {
 
   // Create game board initialized to starting state
   newBoard = makeBoard(rows,cols,inFile,numCoords);
-  oldBoard = makeBoard(rows,cols,inFile,numCoords);
-  print(newBoard,atoi(argv[2]),rows,cols,iters);
-  
+  refBoard = copyBoard(newBoard,rows,cols);
+  print(refBoard,atoi(argv[2]),rows,cols,0);
+
   // Apply the life and death conditions to the board
   gettimeofday(&start, NULL);
   while (count < iters+1) {
-    // evolve should return the board (char *)
-    evolve(x,y,rows,cols,newBoard,oldBoard,argv,numCoords,count);
+    evolve(x,y,rows,cols,newBoard,refBoard,argv,numCoords,count);
+    
+    temp = *refBoard;
+    *refBoard = *newBoard; // reference board updated to be the newer board
+    *newBoard = *temp;
     ++count;
   }
   gettimeofday(&end, NULL);
@@ -279,9 +281,12 @@ int main(int argc, char *argv[]) {
                   iters, rows, cols, elapsed/1000000.);
 
   free(newBoard);
-  free(oldBoard);
+  free(refBoard);
   fclose(inFile);
-  board = NULL;
+  refBoard = NULL;
+  newBoard = NULL;
+  temp = NULL;
 
   return 0;
 }
+
