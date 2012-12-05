@@ -8,9 +8,7 @@
 #include <sys/time.h>
 #include <string.h>
 
-// NOTES: I don't know if all txt input files work.
-//        oscillator, walker, pulsar, and testedges seem to
-//        work, but I don't know about grower and gosper.
+// NOTES: makeBoard is malfunctioning
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords);
 void print(char* arr, int willPrint, int rows, int cols, int iters);
@@ -82,11 +80,16 @@ void print(char* arr, int willPrint, int rows, int cols, int iters) {
   system("clear");
   printf("Iteration %d:\n\n",iters); 
   int i;
-  for (i = 0; i < rows*cols; i++) {
-    printf("%c ",arr[i]);
-    if (!((i+1) % cols)) {
-      printf("\n");
+  int k;
+  for (i = 0; i < rows; i++) {
+    for (k = 0; k < cols; k++) {
+      printf("%c ",arr[i*rows+k]);
     }
+    printf("\n");
+    
+    /*if (!((i+1) % cols)) {
+      printf("\n");
+    }*/
   }
 }
 
@@ -270,10 +273,12 @@ int main(int argc, char *argv[]) {
   gettimeofday(&start, NULL);
   while (count < iters+1) {
     evolve(x,y,rows,cols,newBoard,refBoard,argv,numCoords,count);
-    /*printf("temBoard: %s\n", temp);
+    // Very helpful visuals for showing which versions of the board
+    // are being stored in our three char *'s
+    /*printf("temBoard: %s\n", temp);  
     printf("refBoard: %s\n", refBoard);
     printf("newBoard: %s\n", newBoard);*/
-    temp = copyBoard(newBoard,rows,cols); // I think Samer and Manny had a problem with this...
+    temp = copyBoard(newBoard,rows,cols); 
     refBoard = temp; // reference board updated to be the newer board
     //newBoard = temp;
     ++count;
