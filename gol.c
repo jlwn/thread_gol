@@ -249,7 +249,7 @@ int main(int argc, char *argv[]) {
   struct timeval start, end;
   char *newBoard = NULL;
   char *refBoard = NULL;
-  char *temp = NULL;
+  char *temp;
 
   // Process command line arguments
   verifyCmdArgs(argc, argv);
@@ -267,7 +267,7 @@ int main(int argc, char *argv[]) {
   while (count < iters+1) {
     evolve(x,y,rows,cols,newBoard,refBoard,argv,numCoords,count);
     
-    temp = *refBoard;
+    *temp = *refBoard;
     *refBoard = *newBoard; // reference board updated to be the newer board
     *newBoard = *temp;
     ++count;
