@@ -1,12 +1,14 @@
 //
-// Zach Lockett-Streiff; Taylor Nation
-// Implementation of Conway's Game of Life
+// Zach Lockett-Streiff; Taylor Nation; Jacob Lewin
+// Implementation of Conway's Game of Life - Threaded Implementation
 //
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <string.h>
+
+// NOTES: makeBoard is malfunctioning
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords);
 void print(char* arr, int willPrint, int rows, int cols, int iters);
@@ -74,15 +76,20 @@ void print(char* arr, int willPrint, int rows, int cols, int iters) {
     return;
   }
   
-  usleep(1000000);
+  usleep(200000);
   system("clear");
   printf("Iteration %d:\n\n",iters); 
   int i;
-  for (i = 0; i < rows*cols; i++) {
-    printf("%c ",arr[i]);
-    if (!((i+1) % cols)) {
-      printf("\n");
+  int k;
+  for (i = 0; i < rows; i++) {
+    for (k = 0; k < cols; k++) {
+      printf("%c ",arr[i*rows+k]);
     }
+    printf("\n");
+    
+    /*if (!((i+1) % cols)) {
+      printf("\n");
+    }*/
   }
 }
 
@@ -261,15 +268,24 @@ int main(int argc, char *argv[]) {
   newBoard = makeBoard(rows,cols,inFile,numCoords);
   refBoard = copyBoard(newBoard,rows,cols);
   print(refBoard,atoi(argv[2]),rows,cols,0);
-
+  //printf("refBoard2: %s\n", refBoard);
   // Apply the life and death conditions to the board
   gettimeofday(&start, NULL);
   while (count < iters+1) {
     evolve(x,y,rows,cols,newBoard,refBoard,argv,numCoords,count);
+
     
-    *temp = *refBoard;
+   /* *temp = *refBoard;
     *refBoard = *newBoard; // reference board updated to be the newer board
-    *newBoard = *temp;
+    *newBoard = *temp;*/
+    // Very helpful visuals for showing which versions of the board
+    // are being stored in our three char *'s
+    /*printf("temBoard: %s\n", temp);  
+    printf("refBoard: %s\n", refBoard);
+    printf("newBoard: %s\n", newBoard);*/
+    temp = copyBoard(newBoard,rows,cols); 
+    refBoard = temp; // reference board updated to be the newer board
+    //newBoard = temp;
     ++count;
   }
   gettimeofday(&end, NULL);
