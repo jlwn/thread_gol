@@ -45,8 +45,8 @@ char* makeBoard(int rows, int cols, FILE* file, int numCoords){
   x = 0;
   y = 0;
   counter = 0;
-  for(i = 0; i< rows; i++){
-  	for(j = 0; j< cols; j++){
+  for(i = 0; i < rows; i++){
+  	for(j = 0; j < cols; j++){
   		array[i*rows+j]= '-';
   	 }
   }
