@@ -15,6 +15,10 @@ char *refBoard;
 static pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_barrier_t my_barrier;
 
+struct grid_args{
+  int my_tid;
+  // int work_unit <- ??
+};
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords);
 void rowPrint(char* arr, int willPrint, int rows, int cols, int iters, 
@@ -106,7 +110,7 @@ void rowPrint(char* arr, int willPrint, int rows, int cols, int iters, int numTi
   int k;
   for (i = 0; i < rows; i++) {
     for (k = 0; k < cols; k++) {
-      printf("%d",currentTid);
+      printf("%d ",currentTid);
     }
     printf("\n");
     if(!((i+1) % numPartitions)){
@@ -130,28 +134,51 @@ void colPrint(char* arr, int willPrint, int rows, int cols, int iters,
     return;
   }
   
-  int currentTid, numPartitions;
+  int currentTid, numPartitions, remainder, row, col, printCounter;
   currentTid = 0;
+  row = rows;
+  col = cols;
   numPartitions = cols/numTids;
-    
- 
-  printf("cols: %d\nTids:%d\nnumPartitions: %d\n",rows,numTids,numPartitions);
+  remainder = cols % numTids;
+
+  printf("cols: %d\nTids:%d \nnumPartitions: %d\n",rows,numTids,numPartitions);
 
   usleep(200000);
   system("clear");
   printf("Iteration %d:\n\n",iters); 
+  int a;
   int i;
   int k;
-  for (i = 0; i < rows; i++) {
+  for (a = 0; a < rows; a++) {
+    for (i = 0; i < numTids; i++) {
+      for (k = 0; k < numPartitions; k++) {
+        printf("%d ", currentTid);
+        printCounter++;
+      }
+      if (remainder) {
+        printf("%d ", currentTid);
+        printCounter++;
+        remainder--;
+      }
+      if (printCounter == cols) {
+        printf("\n");
+	printf("(%d)",printCounter);
+        printCounter = 0;
+	currentTid = 0;
+      }
+      currentTid++;
+    }
+  }
+  /*for (i = 0; i < rows; i++) {
     for (k = 0; k < cols; k++) {
-      printf("%d",currentTid);
+      printf("%d ",currentTid);
       if(!((k+1) % numPartitions)){
         currentTid ++;
       }
     }
     printf("\n");
     currentTid = 0;
- }
+ }*/
 }
 
 void verifyCmdArgs(int argc, char *argv[]) {
@@ -163,9 +190,10 @@ void verifyCmdArgs(int argc, char *argv[]) {
    * Returns: Nothing
    */
   
-  // Verify caller passed in 3 command arguments
-  if (argc != 3) {
-   printf("usage: ./gol configFile printCondition\n");
+  // Verify caller passed in 6 command arguments
+  if (argc != 6) {
+   printf("usage: ./gol configFile printCondition numTIDs partition[0:1]\
+		   print_config[0:1]\n");
    exit(1);
   }
 
@@ -180,6 +208,23 @@ void verifyCmdArgs(int argc, char *argv[]) {
     printf("Invalid printCondition, must be either 0 or 1.\n");
     exit(1);
   }
+
+  // Verify valid numTIDs
+  // TODO: Set numTIDs manually if too large or small
+  if (atoi(argv[3]) < 0 || atoi(argv[3]) > 1000) {
+    printf("Invalid partition option, must be a positive integer < 1000.\n");
+  }
+
+  // Verify valid partition
+  if (atoi(argv[4]) != 0 || atoi(argv[4]) != 1) {
+    printf("Invalid partition, must be either 0 or 1\n");
+  }
+
+  // Verify valid print_config option
+  if (atoi(argv[5]) != 0 || atoi(argv[5]) != 1) {
+    printf("Invalid print_config, must be either 0 or 1\n");
+  }
+
 }
 
 int numNeighbors(int xCoord, int yCoord, int rows, int cols, char *board,
@@ -330,7 +375,7 @@ int main(int argc, char *argv[]) {
     printf("malloc error\n");
     exit(1);
   }
-
+  
   // Process command line arguments
   // TODO edit to process more cmdline args
   //verifyCmdArgs(argc, argv);

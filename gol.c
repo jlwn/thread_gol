@@ -18,7 +18,7 @@ int numNeighbors(int xcoord, int ycoord, int rows, int cols, char *board,
 char *copyBoard(char *board, int rows, int cols);
 void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard, 
     char *argv[], int numCoords, int iters);
-FILE *openFile(char *filename[]);
+FILE *openFile(char filename[]);
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords){
   /*
@@ -235,7 +235,7 @@ void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard,
     print(newBoard,atoi(argv[2]),rows,cols,iters);
 }
 
-FILE *openFile(char *filename[]) {
+FILE *openFile(char filename[]) {
   /*
    * Purpose: Bundles together a few lines for opening the test parameter
    *          file
@@ -260,6 +260,9 @@ int main(int argc, char *argv[]) {
   char *newBoard = NULL;
   char *refBoard = NULL;
   char *temp;
+
+  // Threading variables
+  
 
   // Process command line arguments
   verifyCmdArgs(argc, argv);
