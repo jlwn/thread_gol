@@ -261,6 +261,9 @@ int main(int argc, char *argv[]) {
   char *refBoard = NULL;
   char *temp;
 
+  // Threading variables
+  
+
   // Process command line arguments
   verifyCmdArgs(argc, argv);
 
