@@ -130,12 +130,12 @@ void colPrint(char* arr, int willPrint, int rows, int cols, int iters,
     return;
   }
   
-  int currentTid, numPartitions;
+  int currentTid,extras, numPartitions;
   currentTid = 0;
   numPartitions = cols/numTids;
-    
+  extras = cols % numTids;
  
-  printf("cols: %d\nTids:%d\nnumPartitions: %d\n",rows,numTids,numPartitions);
+  printf("cols: %d\nTids:%d\nnumPartitions: %d\nExtras: %d\n",rows,numTids,numPartitions,extras);
 
   usleep(200000);
   system("clear");
@@ -145,6 +145,10 @@ void colPrint(char* arr, int willPrint, int rows, int cols, int iters,
   for (i = 0; i < rows; i++) {
     for (k = 0; k < cols; k++) {
       printf("%d",currentTid);
+      if(extras){
+        printf("%d",currentTid);
+        k++; 
+      }
       if(!((k+1) % numPartitions)){
         currentTid ++;
       }

@@ -7,18 +7,26 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <string.h>
+#include <pthread.h>
 
-// NOTES: makeBoard is malfunctioning
+// GLOBAL VARIABLES:
+char *newBoard;
+char *refBoard;
+static pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_barrier_t my_barrier;
+
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords);
-void print(char* arr, int willPrint, int rows, int cols, int iters);
+void rowPrint(char* arr, int willPrint, int rows, int cols, int iters, 
+    int numTids);
+void colPrint(char* arr, int willPrint, int rows, int cols, int iters);
 void verifyCmdArgs(int argc, char *argv[]);
 int numNeighbors(int xcoord, int ycoord, int rows, int cols, char *board,
                  int numcoords);
 char *copyBoard(char *board, int rows, int cols);
-void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard, 
+void rowEvolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard, 
     char *argv[], int numCoords, int iters);
-FILE *openFile(char filename[]);
+FILE *openFile(char *filename[]);
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords){
   /*
@@ -53,6 +61,11 @@ char* makeBoard(int rows, int cols, FILE* file, int numCoords){
 
   // Read in coordinates to update board to its initial state
   while(counter < numCoords){
+    if(file = NULL){
+      perror("This is the error: ");
+      exit(1);
+    
+    }
     fscanf(file, "%d%d", &x,&y);
 	array[x*rows+y]='@';
 	counter++;
@@ -61,7 +74,7 @@ char* makeBoard(int rows, int cols, FILE* file, int numCoords){
   return array;
 }
 
-void print(char* arr, int willPrint, int rows, int cols, int iters) {
+void rowPrint(char* arr, int willPrint, int rows, int cols, int iters, int numTids) {
   /*
   * Purpose: Prints the current iteration and board
   * Inputs: Game board:                arr
@@ -76,23 +89,30 @@ void print(char* arr, int willPrint, int rows, int cols, int iters) {
     return;
   }
   
+  int currentTid,numPartitions;
+  currentTid = 0;
+  numPartitions = rows/numTids;
+ 
+  printf("numPartitions: %d\n",numPartitions);
+
   usleep(200000);
   system("clear");
   printf("Iteration %d:\n\n",iters); 
-  int i,k,count,partitions;
-  partitions = 4;
-
-
+  int i;
+  int k;
   for (i = 0; i < rows; i++) {
     for (k = 0; k < cols; k++) {
-      printf("%d ",count);
+      printf("%d",currentTid);
+      if (k = cols-1) {
+        printf("\n");
+      }
+
     }
-    printf("\n");
-    
-    if (!((i+1) % partitions)) {
-      count++;
+    printf("count\n");
+    if(!(i % numPartitions)){
+      currentTid ++;
     }
-  }
+ }
 }
 
 void verifyCmdArgs(int argc, char *argv[]) {
@@ -194,6 +214,8 @@ char *copyBoard(char *board, int rows, int cols) {
   return newBoard;
 }
 
+
+//TODO add TID, figure out how to specify which thread looks where
 void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard,
     char *argv[], int numCoords, int iters) {
   /*
@@ -232,18 +254,17 @@ void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard,
         
     }
   }
-    print(newBoard,atoi(argv[2]),rows,cols,iters);
+  //  rowPrint(newBoard,atoi(argv[2]),rows,cols,iters);
 }
 
-FILE *openFile(char filename[]) {
+FILE *openFile(char *filename[]) {
   /*
    * Purpose: Bundles together a few lines for opening the test parameter
    *          file
    * Inputs:  Input file: filename
    * Returns: Opened file: inFile
    */
-  printf("Filename:%s\n",filename);
-  FILE *inFile = fopen(filename,"r");
+  FILE *inFile = fopen(filename[1],"r");
   if (inFile == NULL) {
     printf("Unable to load test parameters.\n");
     exit(1);
@@ -254,45 +275,66 @@ FILE *openFile(char filename[]) {
 int main(int argc, char *argv[]) {
   // Variable declarations
   int count = 1;
-  int rows,cols,iters,numCoords,x,y,neighbors;
-  FILE *inFile = openFile(argv[1]);
+  int rows,cols,iters,numCoords,x,y,neighbors, *tid_args,numThreads;
+  FILE *inFile = openFile(argv);
   struct timeval start, end;
-  char *newBoard = NULL;
-  char *refBoard = NULL;
+  newBoard = NULL;
+  refBoard = NULL;
   char *temp;
+  pthread_t *tids;
+  numThreads = atoi(argv[3]);
+  if(!(tids = malloc(sizeof(pthread_t)*numThreads))){
+    printf("malloc error\n");
+    exit(1);
+  }
+  if(!(tid_args = malloc(sizeof(pthread_t)*numThreads))){
+    printf("malloc error\n");
+    exit(1);
+  }
 
   // Process command line arguments
-  verifyCmdArgs(argc, argv);
+  // TODO edit to process more cmdline args
+  //verifyCmdArgs(argc, argv);
 
   // Open test parameter file and read in first 4 lines
   fscanf(inFile, "%d %d %d %d", &rows, &cols, &iters, &numCoords);
-
+  printf("this fscanf is okay\n");
   // Create game board initialized to starting state
   newBoard = makeBoard(rows,cols,inFile,numCoords);
   refBoard = copyBoard(newBoard,rows,cols);
-  print(refBoard,atoi(argv[2]),rows,cols,0);
+  rowPrint(refBoard,atoi(argv[2]),rows,cols,0,numThreads);
   //printf("refBoard2: %s\n", refBoard);
   // Apply the life and death conditions to the board
-  /*gettimeofday(&start, NULL);
+  gettimeofday(&start, NULL);
+ 
+  /*
+   *  Spawn worker threads
+   *  each thread does a round, taking a specified a part of the board
+   *    refBoard still passed into evolve, but we're going to be looking at
+   *    different portions of it. 
+   *
+   *    
+   */
   while (count < iters+1) {
-    evolve(x,y,rows,cols,newBoard,refBoard,argv,numCoords,count);
+     count ++;
 
-   
-    *temp = *refBoard;
-    *refBoard = *newBoard; // reference board updated to be the newer board
-    *newBoard = *temp;*/
+    
     // Very helpful visuals for showing which versions of the board
     // are being stored in our three char *'s
     /*printf("temBoard: %s\n", temp);  
     printf("refBoard: %s\n", refBoard);
-    printf("newBoard: %s\n", newBoard);* s/
-    temp = copyBoard(newBoard,rows,cols); 
+    printf("newBoard: %s\n", newBoard);*/
+    
+    
+   /* temp = copyBoard(newBoard,rows,cols); 
     refBoard = temp; // reference board updated to be the newer board
-    //newBoard = temp;
-    ++count;
+    ++count;*/
+
+   
+    
   }
   gettimeofday(&end, NULL);
- */ 
+  
   // Time calculations
   long elapsed = (end.tv_sec-start.tv_sec)*1000000 + (end.tv_usec - 
                   start.tv_usec);
