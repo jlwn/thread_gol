@@ -12,12 +12,17 @@
 // GLOBAL VARIABLES:
 char *newBoard;
 char *refBoard;
+int rows;
+int cols;
 static pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_barrier_t my_barrier;
 
-struct grid_args{
+
+struct tid_args{
   int my_tid;
-  // int work_unit <- ??
+  int startRow;
+  int endRow;
+  int startCol;
+  int endCol;
 };
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords);
@@ -26,11 +31,10 @@ void rowPrint(char* arr, int willPrint, int rows, int cols, int iters,
 void colPrint(char* arr, int willPrint, int rows, int cols, int iters, 
     int numTids);
 void verifyCmdArgs(int argc, char *argv[]);
-int numNeighbors(int xcoord, int ycoord, int rows, int cols, char *board,
-                 int numcoords);
+int numNeighbors(int xCoord, int yCoord);
 char *copyBoard(char *board, int rows, int cols);
-void rowEvolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard, 
-    char *argv[], int numCoords, int iters);
+void evolve(int startRow, int endRow, int startCol, int endCol);
+void print(int willPrint);
 FILE *openFile(char *filename[]);
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords){
@@ -82,6 +86,20 @@ char* makeBoard(int rows, int cols, FILE* file, int numCoords){
   return array;
 }
 
+void print(int willPrint) {
+  // Prints arr as a matrix
+  if (!willPrint) {
+    printf("Not printing board.\n");
+    return;
+  }
+  int i;
+  for (i = 0; i < rows*cols; i++) {
+    printf("%c ",refBoard[i]);
+    if (!((i+1) % cols)) {
+      printf("\n");
+    }
+  }
+}
 void rowPrint(char* arr, int willPrint, int rows, int cols, int iters, int numTids) {
   /*
   * Purpose: Prints the current iteration and board
@@ -236,22 +254,25 @@ void verifyCmdArgs(int argc, char *argv[]) {
   // TODO: Set numTIDs manually if too large or small
   if (atoi(argv[3]) < 0 || atoi(argv[3]) > 1000) {
     printf("Invalid partition option, must be a positive integer < 1000.\n");
+    exit(1);
   }
 
   // Verify valid partition
   if (atoi(argv[4]) != 0 || atoi(argv[4]) != 1) {
     printf("Invalid partition, must be either 0 or 1\n");
+    exit(1);
+
   }
 
   // Verify valid print_config option
   if (atoi(argv[5]) != 0 || atoi(argv[5]) != 1) {
     printf("Invalid print_config, must be either 0 or 1\n");
+    exit(1);
   }
 
 }
 
-int numNeighbors(int xCoord, int yCoord, int rows, int cols, char *board,
-                 int numCoords){
+int numNeighbors(int xCoord, int yCoord){
   /*
    * Purpose: Finds the number of neighbors of a point on the board
    * Inputs: Coordinates:            xCoord, yCoord
@@ -323,8 +344,7 @@ char *copyBoard(char *board, int rows, int cols) {
 
 
 //TODO add TID, figure out how to specify which thread looks where
-void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard,
-    char *argv[], int numCoords, int iters) {
+void evolve(void *arg) {
   /*
    * Purpose: Examines the board and applies the rules of the Game of Life
    * Inputs: Coordinates:            x, y
@@ -336,11 +356,15 @@ void evolve(int x, int y, int rows, int cols, char *newBoard, char *refBoard,
    * Returns: Nothing
    */ 
   
-  //char *newBoard = copyBoard(board, rows, cols);
-  
-  for(x = 0; x < rows; x++) {
-    for(y = 0; y < cols; y++) {
-      int neighbors = numNeighbors(x, y, rows, cols, refBoard, numCoords);
+
+  int startRow,endRow,startCol,endCol;
+  startRow = (int)arg->startRow;
+  endRow = (int)arg->endRow;
+  startCol = (int)arg->startCol;
+  endRow = (int)arg->endCol;
+  for(x = startRow; x < endRow; x++) {
+    for(y = startCol; y < endCol; y++) {
+      int neighbors = numNeighbors(x, y);
       //printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
       if (neighbors < 0 || neighbors > 8) {
         printf("Invalid number of neighbors. Should be between 0 and 8");
@@ -379,6 +403,9 @@ FILE *openFile(char *filename[]) {
   return inFile;
 }
 
+void partition(struct tid_args tid){
+  
+}
 int main(int argc, char *argv[]) {
   // Variable declarations
   int count = 1;
