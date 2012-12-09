@@ -33,7 +33,7 @@ void colPrint(char* arr, int willPrint, int rows, int cols, int iters,
 void verifyCmdArgs(int argc, char *argv[]);
 int numNeighbors(int xCoord, int yCoord);
 char *copyBoard(char *board, int rows, int cols);
-void evolve(int startRow, int endRow, int startCol, int endCol);
+void *evolve(void *args);
 void print(int willPrint);
 FILE *openFile(char *filename[]);
 
@@ -310,7 +310,7 @@ int numNeighbors(int xCoord, int yCoord){
       // Increments neighborCounter for each neighbor found
       if(currentRow == x && currentCol == y){
         continue;
-      }else if(board[currentRow*rows+currentCol] == '@'){
+      }else if(refBoard[currentRow*rows+currentCol] == '@'){
          neighborCounter++;
       }
     }
@@ -344,7 +344,7 @@ char *copyBoard(char *board, int rows, int cols) {
 
 
 //TODO add TID, figure out how to specify which thread looks where
-void evolve(void *arg) {
+void *evolve(void *args) {
   /*
    * Purpose: Examines the board and applies the rules of the Game of Life
    * Inputs: Coordinates:            x, y
@@ -356,12 +356,12 @@ void evolve(void *arg) {
    * Returns: Nothing
    */ 
   
-
+  int x,y;
   int startRow,endRow,startCol,endCol;
-  startRow = (int)arg->startRow;
-  endRow = (int)arg->endRow;
-  startCol = (int)arg->startCol;
-  endRow = (int)arg->endCol;
+  startRow = ((struct tid_args *)args)->startRow;
+  endRow = ((struct tid_args *)args)->endRow;
+  startCol = ((struct tid_args *)args)->startCol;
+  endRow = ((struct tid_args *)args)->endCol;
   for(x = startRow; x < endRow; x++) {
     for(y = startCol; y < endCol; y++) {
       int neighbors = numNeighbors(x, y);
@@ -403,25 +403,100 @@ FILE *openFile(char *filename[]) {
   return inFile;
 }
 
-void partition(struct tid_args tid){
+void partition(struct tid_args *thread_args, int numTids, int partitionType){
+  int partitions,remainder,i,currentRow;
+  currentRow = 0;
+  partitions = rows/numTids-1;
+  remainder = rows % numTids;
+  printf("There are %d rows per thread\n",partitions);
+  if(!partitionType){
+    for(i=0;i<numTids;i++){
+      int startRow,endRow;
+	  startRow = currentRow;
+	  endRow = currentRow+partitions;
+	  if(remainder){
+	    endRow++;
+	    partitions++;
+  	    remainder--;
+  	  }
+  	  thread_args[i].my_tid = i;
+	  thread_args[i].startRow = startRow;
+	  thread_args[i].endRow = endRow;
+	  thread_args[i].startCol = 0;
+	  thread_args[i].endCol = cols-1;
+	  currentRow+=partitions+1;
+	  partitions = rows/numTids-1;
+
+    }
+  }else{    
+    partitions = cols/numTids-1;
+    int currentCol;
+    currentCol = 0;
+    for(i=0;i<numTids;i++){
+      int startCol,endCol;
+	  startCol = currentCol;
+	  endCol = currentCol+partitions;
+	  if(remainder){
+	    endCol++;
+	    partitions++;
+  	    remainder--;
+  	  }
+  	  thread_args[i].my_tid = i;
+	  thread_args[i].startRow = 0;
+	  thread_args[i].endRow = rows-1;
+	  thread_args[i].startCol = startCol;
+	  thread_args[i].endCol = endCol;
+	  currentCol+=partitions+1;
+	  partitions = rows/numTids-1;
+
+    }
+  }
+
+}
+
+void printPartitions(struct tid_args *thread_args, int numTids, int willPrint){
+  if(!willPrint){
+    return;
+  }else{
+    int i;
+    struct tid_args current;
+    for(i = 0; i<numTids; i++){
+      current = thread_args[i];
+      int tid,startRow,endRow,rowPartSize,startCol,endCol,colPartSize;
+      tid = current.my_tid;
+      startRow = current.startRow;
+      endRow = current.endRow;
+      rowPartSize = current.endRow-current.startRow+1;
+      startCol = current.startCol;
+      endCol = current.endCol;
+      colPartSize = current.endCol-current.startCol+1;
+      printf("tid %d: rows: %d:%d (%d) cols: %d:%d (%d)\n",tid,startRow,endRow,rowPartSize,
+        startCol,endCol,colPartSize);
+    }
+  }
   
+
 }
 int main(int argc, char *argv[]) {
   // Variable declarations
   int count = 1;
-  int rows,cols,iters,numCoords,x,y,neighbors, *tid_args,numThreads;
+  int iters,numCoords,numThreads,printPartition,partitionType;
   FILE *inFile = openFile(argv);
   struct timeval start, end;
   newBoard = NULL;
   refBoard = NULL;
   char *temp;
   pthread_t *tids;
+  struct tid_args *thread_args;
   numThreads = atoi(argv[3]);
-  if(!(tids = malloc(sizeof(pthread_t)*numThreads))){
+  partitionType = atoi(argv[4]);
+  printPartition = atoi(argv[5]);
+  
+  if(!(tids = (pthread_t *)malloc(sizeof(pthread_t)*numThreads))){
     printf("malloc error\n");
     exit(1);
   }
-  if(!(tid_args = malloc(sizeof(pthread_t)*numThreads))){
+  if(!(thread_args = (struct tid_args *)malloc(sizeof(struct tid_args)*numThreads))){
     printf("malloc error\n");
     exit(1);
   }
@@ -432,11 +507,11 @@ int main(int argc, char *argv[]) {
 
   // Open test parameter file and read in first 4 lines
   fscanf(inFile, "%d %d %d %d", &rows, &cols, &iters, &numCoords);
-  printf("this fscanf is okay\n");
+  printf("numThreads: %d, partitionType: %d, printPartition: %d\n",numThreads,
+    partitionType, printPartition);
   // Create game board initialized to starting state
   newBoard = makeBoard(rows,cols,inFile,numCoords);
   refBoard = copyBoard(newBoard,rows,cols);
-  rowPrint(refBoard,atoi(argv[2]),rows,cols,0,numThreads);
   //printf("refBoard2: %s\n", refBoard);
   // Apply the life and death conditions to the board
   gettimeofday(&start, NULL);
@@ -449,9 +524,10 @@ int main(int argc, char *argv[]) {
    *
    *    
    */
+  partition(thread_args,numThreads,partitionType);
+  printPartitions(thread_args,numThreads,printPartition);
   while (count < iters+1) {
-     count ++;
-
+     count ++;     
     
     // Very helpful visuals for showing which versions of the board
     // are being stored in our three char *'s
