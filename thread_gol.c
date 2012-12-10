@@ -358,7 +358,7 @@ void *evolve(void *args) {
    * Returns: Nothing
    */ 
 
-
+  printf("Hello from thread %d\n",((struct tid_args *)args)->my_tid);
 
   int x,y;
   int startRow,endRow,startCol,endCol;
@@ -369,7 +369,7 @@ void *evolve(void *args) {
   for(x = startRow; x < endRow; x++) {
     for(y = startCol; y < endCol; y++) {
       int neighbors = numNeighbors(x, y);
-      printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
+      //printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
       if (neighbors < 0 || neighbors > 8) {
         printf("Invalid number of neighbors. Should be between 0 and 8");
         exit(1);
