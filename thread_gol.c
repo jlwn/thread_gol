@@ -16,6 +16,7 @@ int rows;
 int cols;
 struct tid_args *thread_args;
 static pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_barrier_t barrier;
 
 
 struct tid_args{
@@ -359,7 +360,7 @@ void *evolve(void *args) {
    */ 
 
 
-
+  printf("Hello from tid %d\n",((struct tid_args *)args)->my_tid);
   int x,y;
   int startRow,endRow,startCol,endCol;
   startRow = ((struct tid_args *)args)->startRow;
@@ -501,7 +502,11 @@ int main(int argc, char *argv[]) {
     printf("malloc error\n");
     exit(1);
   }
-  
+
+  if(pthread_barrier_init(&mybarrier,0,numThreads)){
+    perror("Pthread barrier init error\n");
+    exit(1);
+  }
   // Process command line arguments
   // TODO edit to process more cmdline args
   //verifyCmdArgs(argc, argv);
