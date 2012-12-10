@@ -14,6 +14,7 @@ char *newBoard;
 char *refBoard;
 int rows;
 int cols;
+struct tid_args *thread_args;
 static pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
@@ -23,6 +24,7 @@ struct tid_args{
   int endRow;
   int startCol;
   int endCol;
+  int willPrint;
 };
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords);
@@ -355,7 +357,9 @@ void *evolve(void *args) {
    *         Number of iterations:   iters
    * Returns: Nothing
    */ 
-  
+
+
+
   int x,y;
   int startRow,endRow,startCol,endCol;
   startRow = ((struct tid_args *)args)->startRow;
@@ -365,7 +369,7 @@ void *evolve(void *args) {
   for(x = startRow; x < endRow; x++) {
     for(y = startCol; y < endCol; y++) {
       int neighbors = numNeighbors(x, y);
-      //printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
+      printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
       if (neighbors < 0 || neighbors > 8) {
         printf("Invalid number of neighbors. Should be between 0 and 8");
         exit(1);
@@ -454,14 +458,12 @@ void partition(struct tid_args *thread_args, int numTids, int partitionType){
 
 }
 
-void printPartitions(struct tid_args *thread_args, int numTids, int willPrint){
+void printPartitions(struct tid_args *thread_args, int tid, int willPrint){
   if(!willPrint){
     return;
   }else{
-    int i;
-    struct tid_args current;
-    for(i = 0; i<numTids; i++){
-      current = thread_args[i];
+      struct tid_args current;
+      current = thread_args[tid];
       int tid,startRow,endRow,rowPartSize,startCol,endCol,colPartSize;
       tid = current.my_tid;
       startRow = current.startRow;
@@ -473,7 +475,7 @@ void printPartitions(struct tid_args *thread_args, int numTids, int willPrint){
       printf("tid %d: rows: %d:%d (%d) cols: %d:%d (%d)\n",tid,startRow,endRow,rowPartSize,
         startCol,endCol,colPartSize);
     }
-  }
+  
   
 
 }
@@ -487,7 +489,6 @@ int main(int argc, char *argv[]) {
   refBoard = NULL;
   char *temp;
   pthread_t *tids;
-  struct tid_args *thread_args;
   numThreads = atoi(argv[3]);
   partitionType = atoi(argv[4]);
   printPartition = atoi(argv[5]);
@@ -525,8 +526,16 @@ int main(int argc, char *argv[]) {
    *    
    */
   partition(thread_args,numThreads,partitionType);
-  printPartitions(thread_args,numThreads,printPartition);
   while (count < iters+1) {
+     int i,ret;
+     for(i = i; i<numThreads; i++){
+       thread_args[i].willPrint = printPartition;
+       ret = pthread_create(&tids[i],0,evolve,&thread_args[i]);
+       if(ret){
+         perror("Error pthread_create\n");
+       }
+       
+     }
      count ++;     
     
     // Very helpful visuals for showing which versions of the board
