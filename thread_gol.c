@@ -360,18 +360,21 @@ void *evolve(void *args) {
    */ 
 
 
-  printf("Hello from tid %d\n,with range %d:%d",((struct tid_args *)args)->my_tid,((struct tid_args *)args)->startRow,
-      ((struct tid_args *)args)->endRow);
+  // printf("Hello from tid %d,with range %d:%d\n",((struct tid_args *)args)->my_tid,((struct tid_args *)args)->startRow,
+  //    ((struct tid_args *)args)->endRow);
   int x,y;
   int startRow,endRow,startCol,endCol;
   startRow = ((struct tid_args *)args)->startRow;
   endRow = ((struct tid_args *)args)->endRow;
   startCol = ((struct tid_args *)args)->startCol;
   endRow = ((struct tid_args *)args)->endCol;
+  printf("startcol = %d, endcol = %d\n", startCol, endCol);
+  // TODO determine the cause of abberation in endCol
+  //      likely caused by the partition func.
   for(x = startRow; x < endRow; x++) {
     for(y = startCol; y < endCol; y++) {
       int neighbors = numNeighbors(x, y);
-      //printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
+      // printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
       if (neighbors < 0 || neighbors > 8) {
         printf("Invalid number of neighbors. Should be between 0 and 8");
         exit(1);
