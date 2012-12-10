@@ -391,6 +391,7 @@ void *evolve(void *args) {
     }
   }
   //  rowPrint(newBoard,atoi(argv[2]),rows,cols,iters);
+  pthread_barrier_wait(&barrier);
 }
 
 FILE *openFile(char *filename[]) {
@@ -503,7 +504,7 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  if(pthread_barrier_init(&mybarrier,0,numThreads)){
+  if(pthread_barrier_init(&barrier,0,numThreads)){
     perror("Pthread barrier init error\n");
     exit(1);
   }
@@ -533,7 +534,7 @@ int main(int argc, char *argv[]) {
   partition(thread_args,numThreads,partitionType);
   while (count < iters+1) {
      int i,ret;
-     for(i = i; i<numThreads; i++){
+     for(i = 0; i<numThreads; i++){
        thread_args[i].willPrint = printPartition;
        ret = pthread_create(&tids[i],0,evolve,&thread_args[i]);
        if(ret){
@@ -541,7 +542,10 @@ int main(int argc, char *argv[]) {
        }
        
      }
-     count ++;     
+     for(i=0; i<numThreads;i++){
+       pthread_join(tids[i],0);
+     }
+         
     
     // Very helpful visuals for showing which versions of the board
     // are being stored in our three char *'s
@@ -550,9 +554,9 @@ int main(int argc, char *argv[]) {
     printf("newBoard: %s\n", newBoard);*/
     
     
-   /* temp = copyBoard(newBoard,rows,cols); 
+    temp = copyBoard(newBoard,rows,cols); 
     refBoard = temp; // reference board updated to be the newer board
-    ++count;*/
+    ++count;
 
    
     
