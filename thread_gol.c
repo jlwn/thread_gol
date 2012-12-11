@@ -360,7 +360,7 @@ void *evolve(void *args) {
    */ 
 
 
-  printf("Hello from tid %d\n,with range %d:%d",((struct tid_args *)args)->my_tid,((struct tid_args *)args)->startRow,
+  printf("Hello from tid %d,with range %d:%d\n",((struct tid_args *)args)->my_tid,((struct tid_args *)args)->startRow,
       ((struct tid_args *)args)->endRow);
   int x,y;
   int startRow,endRow,startCol,endCol;
