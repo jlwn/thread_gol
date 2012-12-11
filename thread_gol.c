@@ -26,7 +26,7 @@ struct tid_args{
   int startCol;
   int endCol;
   int willPrint;
-  int iters;
+  int iter;
 };
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords);
@@ -237,8 +237,7 @@ void verifyCmdArgs(int argc, char *argv[]) {
   
   // Verify caller passed in 6 command arguments
   if (argc != 6) {
-   printf("usage: ./gol configFile printCondition numTIDs partition[0:1]\
-		   print_config[0:1]\n");
+   printf("usage: ./gol configFile printCondition numTIDs partition[0:1] print_config[0:1]\n");
    exit(1);
   }
 
@@ -365,40 +364,43 @@ void *evolve(void *args) {
   // printf("Hello from tid %d,with range %d:%d\n",((struct tid_args *)args)->my_tid,((struct tid_args *)args)->startRow,
   //    ((struct tid_args *)args)->endRow);
 
-  int x,y;
+  int x, y, z;
   int start_Row,end_Row,start_Col,end_Col;
   start_Row = ((struct tid_args *)args)->startRow;
   end_Row = ((struct tid_args *)args)->endRow;
   start_Col = ((struct tid_args *)args)->startCol;
-  end_Row = ((struct tid_args *)args)->endCol;
+  end_Col = ((struct tid_args *)args)->endCol;
   printf("startcol = %d, endcol = %d\n", start_Col, end_Col);
   // TODO determine the cause of abberation in endCol
   //      likely caused by the partition func.
-  for(x = start_Row; x < end_Row; x++) {
-    for(y = start_Col; y < end_Col; y++) {
-      int neighbors = numNeighbors(x, y);
-      // printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
-      if (neighbors < 0 || neighbors > 8) {
-        printf("Invalid number of neighbors. Should be between 0 and 8");
-        exit(1);
-      }
-      if(neighbors < 2){
-        printf("x = %d, y = %d\n", x, y);
-        newBoard[x*rows+y]= '-';
+  
+  // Loop over the specified number of iterations
+  for(z = 0; z < ((struct tid_args *)args)->iter; z++) {
+    for(x = start_Row; x < end_Row; x++) {
+      for(y = start_Col; y < end_Col; y++) {
+          int neighbors = numNeighbors(x, y);
+        // printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
+        if (neighbors < 0 || neighbors > 8) {
+          printf("Invalid number of neighbors. Should be between 0 and 8");
+          exit(1);
+        }
+        printf("startcol = %d, endcol = %d\n", start_Col, end_Col);
+        if(neighbors < 2){
+          printf("x = %d, y = %d\n", x, y);
+          newBoard[x*rows+y]= '-';
       
-      } else if(neighbors > 3){
-
-      } else if(neighbors == 3){
-          newBoard[x*rows+y] = '@';
+        } else if(neighbors > 3){
+  
+        } else if(neighbors == 3){
+            newBoard[x*rows+y] = '@';
       
-      } else {
-          newBoard[x*rows+y] = refBoard[x*rows+y];
+        } else {
+            newBoard[x*rows+y] = refBoard[x*rows+y];
+        }
       }
-        
     }
-  }
-  //  rowPrint(newBoard,atoi(argv[2]),rows,cols,iters);
   pthread_barrier_wait(&barrier);
+  }
 }
 
 FILE *openFile(char *filename[]) {
@@ -553,45 +555,36 @@ int main(int argc, char *argv[]) {
 
   // TODO change from multiple threadspawns/joins to one
   //
-  while (count < iters+1) {
-     int i,ret;
-     for(i = 0; i<numThreads; i++){
-       int tid,start,end;
-       tid = thread_args[i].my_tid;
-       start = thread_args[i].startCol;
-       end = thread_args[i].endCol;
-       printf("Tid: %d startCol:%d, endcol:%d\n",thread_args[i].my_tid,
-           thread_args[i].startCol,thread_args[i].endCol);
+  int i, ret;
+
+  // spawn threads
+  for(i = 0; i<numThreads; i++) {
+     printf("Tid: %d startCol:%d, endcol:%d\n",thread_args[i].my_tid,
+         thread_args[i].startCol,thread_args[i].endCol);
      
-       thread_args[i].willPrint = printPartition;
-       //TODO somewhere between the pthread_create and the resulting evolve
-       //call, the value of the elements in thread_args[i] get changed. I
-       //think it's a synchronicity issue.
-       ret = pthread_create(&tids[i],0,evolve,(void *)&thread_args[i]);
-       if(ret){
-         perror("Error pthread_create\n");
-       }
-       
+     thread_args[i].willPrint = printPartition;
+     thread_args[i].iter = iters;
+     //TODO somewhere between the pthread_create and the resulting evolve
+     //call, the value of the elements in thread_args[i] get changed. I
+     //think it's a synchronicity issue.
+     ret = pthread_create(&tids[i],0,evolve,(void *)&thread_args[i]);
+     if(ret){
+       perror("Error pthread_create\n");
      }
-     for(i=0; i<numThreads;i++){
-       pthread_join(tids[i],0);
-     }
-         
-     
+  }
+
+  for(i=0; i<numThreads;i++) {
+     pthread_join(tids[i],0);
+  }
     
-    // Very helpful visuals for showing which versions of the board
-    // are being stored in our three char *'s
-    /*printf("temBoard: %s\n", temp);  
+  // Very helpful visuals for showing which versions of the board
+  // are being stored in our three char *'s
+  /*printf("temBoard: %s\n", temp);  
     printf("refBoard: %s\n", refBoard);
     printf("newBoard: %s\n", newBoard);*/
 
-    temp = copyBoard(newBoard,rows,cols); 
-    refBoard = temp; // reference board updated to be the newer board
-    ++count;
-
-   
-    
-  }
+  temp = copyBoard(newBoard,rows,cols); 
+  refBoard = temp; // reference board updated to be the newer board
   gettimeofday(&end, NULL);
   
   // Time calculations
