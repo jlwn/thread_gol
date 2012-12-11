@@ -360,18 +360,25 @@ void *evolve(void *args) {
    */ 
 
 
-  printf("Hello from tid %d,with range %d:%d\n",((struct tid_args *)args)->my_tid,((struct tid_args *)args)->startRow,
-      ((struct tid_args *)args)->endRow);
+
+  // printf("Hello from tid %d,with range %d:%d\n",((struct tid_args *)args)->my_tid,((struct tid_args *)args)->startRow,
+  //    ((struct tid_args *)args)->endRow);
+
   int x,y;
-  int startRow,endRow,startCol,endCol;
-  startRow = ((struct tid_args *)args)->startRow;
-  endRow = ((struct tid_args *)args)->endRow;
-  startCol = ((struct tid_args *)args)->startCol;
-  endRow = ((struct tid_args *)args)->endCol;
-  for(x = startRow; x < endRow; x++) {
-    for(y = startCol; y < endCol; y++) {
+  int start_Row,end_Row,start_Col,end_Col;
+  pthread_mutex_lock(&my_mutex);
+  start_Row = ((struct tid_args *)args)->startRow;
+  end_Row = ((struct tid_args *)args)->endRow;
+  start_Col = ((struct tid_args *)args)->startCol;
+  end_Row = ((struct tid_args *)args)->endCol;
+  pthread_mutex_unlock(&my_mutex);
+  printf("startcol = %d, endcol = %d\n", start_Col, end_Col);
+  // TODO determine the cause of abberation in endCol
+  //      likely caused by the partition func.
+  for(x = start_Row; x < end_Row; x++) {
+    for(y = start_Col; y < end_Col; y++) {
       int neighbors = numNeighbors(x, y);
-      //printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
+      // printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
       if (neighbors < 0 || neighbors > 8) {
         printf("Invalid number of neighbors. Should be between 0 and 8");
         exit(1);
@@ -380,7 +387,6 @@ void *evolve(void *args) {
         newBoard[x*rows+y]= '-';
       
       } else if(neighbors > 3){
-          newBoard[x*rows+y] = '-';
 
       } else if(neighbors == 3){
           newBoard[x*rows+y] = '@';
@@ -433,6 +439,8 @@ void partition(struct tid_args *thread_args, int numTids, int partitionType){
 	  thread_args[i].endCol = cols-1;
 	  currentRow+=partitions+1;
 	  partitions = rows/numTids-1;
+          printf("in Partition:startCol:%d,endCol:%d\n",thread_args[i].startCol,
+              thread_args[i].endCol);
 
     }
   }else{    
@@ -536,8 +544,18 @@ int main(int argc, char *argv[]) {
   while (count < iters+1) {
      int i,ret;
      for(i = 0; i<numThreads; i++){
+       int tid,start,end;
+       tid = thread_args[i].my_tid;
+       start = thread_args[i].startCol;
+       end = thread_args[i].endCol;
+       printf("Tid: %d startCol:%d, endcol:%d\n",thread_args[i].my_tid,
+           thread_args[i].startCol,thread_args[i].endCol);
+     
        thread_args[i].willPrint = printPartition;
-       ret = pthread_create(&tids[i],0,evolve,&thread_args[i]);
+       //TODO somewhere between the pthread_create and the resulting evolve
+       //call, the value of the elements in thread_args[i] get changed. I
+       //think it's a synchronicity issue.
+       ret = pthread_create(&tids[i],0,evolve,(void *)&thread_args[i]);
        if(ret){
          perror("Error pthread_create\n");
        }
@@ -547,6 +565,7 @@ int main(int argc, char *argv[]) {
        pthread_join(tids[i],0);
      }
          
+     
     
     // Very helpful visuals for showing which versions of the board
     // are being stored in our three char *'s
