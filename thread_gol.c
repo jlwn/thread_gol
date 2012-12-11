@@ -26,6 +26,7 @@ struct tid_args{
   int startCol;
   int endCol;
   int willPrint;
+  int iters;
 };
 
 char* makeBoard(int rows, int cols, FILE* file, int numCoords);
@@ -366,12 +367,10 @@ void *evolve(void *args) {
 
   int x,y;
   int start_Row,end_Row,start_Col,end_Col;
-  pthread_mutex_lock(&my_mutex);
   start_Row = ((struct tid_args *)args)->startRow;
   end_Row = ((struct tid_args *)args)->endRow;
   start_Col = ((struct tid_args *)args)->startCol;
   end_Row = ((struct tid_args *)args)->endCol;
-  pthread_mutex_unlock(&my_mutex);
   printf("startcol = %d, endcol = %d\n", start_Col, end_Col);
   // TODO determine the cause of abberation in endCol
   //      likely caused by the partition func.
@@ -384,6 +383,7 @@ void *evolve(void *args) {
         exit(1);
       }
       if(neighbors < 2){
+        printf("x = %d, y = %d\n", x, y);
         newBoard[x*rows+y]= '-';
       
       } else if(neighbors > 3){
@@ -415,6 +415,11 @@ FILE *openFile(char *filename[]) {
   }
   return inFile;
 }
+
+// partition divides the board into segments,
+// which will be assigned to individual threads.
+// if partitionType is 0, we partition by rows;
+// 1, and we partition columns.
 
 void partition(struct tid_args *thread_args, int numTids, int partitionType){
   int partitions,remainder,i,currentRow;
@@ -503,11 +508,13 @@ int main(int argc, char *argv[]) {
   numThreads = atoi(argv[3]);
   partitionType = atoi(argv[4]);
   printPartition = atoi(argv[5]);
-  
+ 
+  // allocate space for array of pthreads
   if(!(tids = (pthread_t *)malloc(sizeof(pthread_t)*numThreads))){
     printf("malloc error\n");
     exit(1);
   }
+  // allocate space for array of pthread args
   if(!(thread_args = (struct tid_args *)malloc(sizeof(struct tid_args)*numThreads))){
     printf("malloc error\n");
     exit(1);
@@ -540,7 +547,12 @@ int main(int argc, char *argv[]) {
    *
    *    
    */
+  // TODO determine if partition is letting threads
+  // read / modify unallocated memory
   partition(thread_args,numThreads,partitionType);
+
+  // TODO change from multiple threadspawns/joins to one
+  //
   while (count < iters+1) {
      int i,ret;
      for(i = 0; i<numThreads; i++){
@@ -572,8 +584,7 @@ int main(int argc, char *argv[]) {
     /*printf("temBoard: %s\n", temp);  
     printf("refBoard: %s\n", refBoard);
     printf("newBoard: %s\n", newBoard);*/
-    
-    
+
     temp = copyBoard(newBoard,rows,cols); 
     refBoard = temp; // reference board updated to be the newer board
     ++count;
