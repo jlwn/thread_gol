@@ -17,6 +17,7 @@ int cols;
 struct tid_args *thread_args;
 static pthread_mutex_t my_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_barrier_t barrier;
+static pthread_barrier_t barrier2;
 
 
 struct tid_args{
@@ -376,8 +377,8 @@ void *evolve(void *args) {
   
   // Loop over the specified number of iterations
   for(z = 0; z < ((struct tid_args *)args)->iter; z++) {
-    for(x = start_Row; x < end_Row; x++) {
-      for(y = start_Col; y < end_Col; y++) {
+    for(x = start_Row; x <= end_Row; x++) {
+      for(y = start_Col; y <= end_Col; y++) {
           int neighbors = numNeighbors(x, y);
         // printf("Point (%d,%d) has %d neighbors\n",x,y,neighbors);
         if (neighbors < 0 || neighbors > 8) {
@@ -400,7 +401,19 @@ void *evolve(void *args) {
       }
     }
   pthread_barrier_wait(&barrier);
+  // pthread_barrier_wait(&barrier2);
   }
+}
+
+// update board after other threads perform evolution
+void *update(void *args) {
+
+  // pthread_barrier_wait(&barrier);
+  char *temp = NULL;
+  temp = copyBoard(newBoard,rows,cols); 
+  refBoard = temp; // reference board updated to be the newer board
+  // pthread_barrier_wait(&barrier2);
+
 }
 
 FILE *openFile(char *filename[]) {
@@ -507,29 +520,32 @@ int main(int argc, char *argv[]) {
   refBoard = NULL;
   char *temp;
   pthread_t *tids;
+  // number of threads running evolve, one additional thread will update board
   numThreads = atoi(argv[3]);
   partitionType = atoi(argv[4]);
   printPartition = atoi(argv[5]);
  
   // allocate space for array of pthreads
-  if(!(tids = (pthread_t *)malloc(sizeof(pthread_t)*numThreads))){
+  if(!(tids = (pthread_t *)malloc(sizeof(pthread_t)*(numThreads+1)))){
     printf("malloc error\n");
     exit(1);
   }
   // allocate space for array of pthread args
-  if(!(thread_args = (struct tid_args *)malloc(sizeof(struct tid_args)*numThreads))){
+  if(!(thread_args = (struct tid_args *)malloc(sizeof(struct tid_args)*(1+numThreads)))){
     printf("malloc error\n");
     exit(1);
   }
-
-  if(pthread_barrier_init(&barrier,0,numThreads)){
+   // Initialize barriers
+   if(pthread_barrier_init(&barrier,0,numThreads)){
     perror("Pthread barrier init error\n");
+    exit(1);
+  } if(pthread_barrier_init(&barrier2,0,numThreads+1)){
+    perror("Pthread barrier2 init error\n");
     exit(1);
   }
   // Process command line arguments
   // TODO edit to process more cmdline args
   //verifyCmdArgs(argc, argv);
-
   // Open test parameter file and read in first 4 lines
   fscanf(inFile, "%d %d %d %d", &rows, &cols, &iters, &numCoords);
   printf("numThreads: %d, partitionType: %d, printPartition: %d\n",numThreads,
@@ -572,19 +588,27 @@ int main(int argc, char *argv[]) {
        perror("Error pthread_create\n");
      }
   }
-
+     i = numThreads;
+     thread_args[i].willPrint = printPartition;
+     thread_args[i].iter = iters;
+     thread_args[i].my_tid = i;
+     //thread_args[i].startRow = startRow;
+     //thread_args[i].endRow = endRow;
+     //thread_args[i].startCol = 0;
+     //thread_args[i].endCol = cols-1;
+     ret = pthread_create(&tids[i],0,update,(void *)&thread_args[i]);
+     if(ret){
+       perror("Error pthread_create\n");
+     }
   for(i=0; i<numThreads;i++) {
      pthread_join(tids[i],0);
   }
-    
+  
   // Very helpful visuals for showing which versions of the board
   // are being stored in our three char *'s
   /*printf("temBoard: %s\n", temp);  
     printf("refBoard: %s\n", refBoard);
     printf("newBoard: %s\n", newBoard);*/
-
-  temp = copyBoard(newBoard,rows,cols); 
-  refBoard = temp; // reference board updated to be the newer board
   gettimeofday(&end, NULL);
   
   // Time calculations
