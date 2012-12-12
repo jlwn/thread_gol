@@ -104,6 +104,8 @@ void print(int willPrint) {
       printf("\n");
     }
   }
+  printf("\n");
+  usleep(500000);
 }
 void rowPrint(char* arr, int willPrint, int rows, int cols, int iters, int numTids) {
   /*
@@ -371,7 +373,7 @@ void *evolve(void *args) {
   end_Row = ((struct tid_args *)args)->endRow;
   start_Col = ((struct tid_args *)args)->startCol;
   end_Col = ((struct tid_args *)args)->endCol;
-  printf("startcol = %d, endcol = %d\n", start_Col, end_Col);
+  //printf("startcol = %d, endcol = %d\n", start_Col, end_Col);
   // TODO determine the cause of abberation in endCol
   //      likely caused by the partition func.
   
@@ -385,9 +387,9 @@ void *evolve(void *args) {
           printf("Invalid number of neighbors. Should be between 0 and 8");
           exit(1);
         }
-        printf("startcol = %d, endcol = %d\n", start_Col, end_Col);
+        //printf("startcol = %d, endcol = %d\n", start_Col, end_Col);
         if(neighbors < 2){
-          printf("x = %d, y = %d\n", x, y);
+          //printf("x = %d, y = %d\n", x, y);
           newBoard[x*rows+y]= '-';
       
         } else if(neighbors > 3){
@@ -401,19 +403,23 @@ void *evolve(void *args) {
       }
     }
   pthread_barrier_wait(&barrier);
-  // pthread_barrier_wait(&barrier2);
+  pthread_barrier_wait(&barrier2);
   }
 }
 
 // update board after other threads perform evolution
 void *update(void *args) {
-
-  // pthread_barrier_wait(&barrier);
+  int z;
   char *temp = NULL;
-  temp = copyBoard(newBoard,rows,cols); 
-  refBoard = temp; // reference board updated to be the newer board
-  // pthread_barrier_wait(&barrier2);
-
+  for(z = 0; z < ((struct tid_args *)args)->iter; z++) {
+    pthread_barrier_wait(&barrier);
+    temp = copyBoard(newBoard,rows,cols); 
+    refBoard = temp; // reference board updated to be the newer board
+    printf("Iteration %d\n",z);
+    print(((struct tid_args *)args)->willPrint);
+    system("clear");
+    pthread_barrier_wait(&barrier2);
+  }
 }
 
 FILE *openFile(char *filename[]) {
@@ -441,7 +447,7 @@ void partition(struct tid_args *thread_args, int numTids, int partitionType){
   currentRow = 0;
   partitions = rows/numTids-1;
   remainder = rows % numTids;
-  printf("There are %d rows per thread\n",partitions);
+  //printf("There are %d rows per thread\n",partitions);
   if(!partitionType){
     for(i=0;i<numTids;i++){
       int startRow,endRow;
@@ -459,8 +465,8 @@ void partition(struct tid_args *thread_args, int numTids, int partitionType){
 	  thread_args[i].endCol = cols-1;
 	  currentRow+=partitions+1;
 	  partitions = rows/numTids-1;
-          printf("in Partition:startCol:%d,endCol:%d\n",thread_args[i].startCol,
-              thread_args[i].endCol);
+          /*printf("in Partition:startCol:%d,endCol:%d\n",thread_args[i].startCol,
+              thread_args[i].endCol);*/
 
     }
   }else{    
@@ -511,6 +517,7 @@ void printPartitions(struct tid_args *thread_args, int tid, int willPrint){
 
 }
 int main(int argc, char *argv[]) {
+  system("clear");
   // Variable declarations
   int count = 1;
   int iters,numCoords,numThreads,printPartition,partitionType;
@@ -535,11 +542,13 @@ int main(int argc, char *argv[]) {
     printf("malloc error\n");
     exit(1);
   }
-   // Initialize barriers
-   if(pthread_barrier_init(&barrier,0,numThreads)){
+  // Initialize barriers
+  if(pthread_barrier_init(&barrier,0,numThreads+1)){
     perror("Pthread barrier init error\n");
     exit(1);
-  } if(pthread_barrier_init(&barrier2,0,numThreads+1)){
+  } 
+  
+  if(pthread_barrier_init(&barrier2,0,numThreads+1)){
     perror("Pthread barrier2 init error\n");
     exit(1);
   }
@@ -548,8 +557,8 @@ int main(int argc, char *argv[]) {
   //verifyCmdArgs(argc, argv);
   // Open test parameter file and read in first 4 lines
   fscanf(inFile, "%d %d %d %d", &rows, &cols, &iters, &numCoords);
-  printf("numThreads: %d, partitionType: %d, printPartition: %d\n",numThreads,
-    partitionType, printPartition);
+  /*printf("numThreads: %d, partitionType: %d, printPartition: %d\n",numThreads,
+    partitionType, printPartition);*/
   // Create game board initialized to starting state
   newBoard = makeBoard(rows,cols,inFile,numCoords);
   refBoard = copyBoard(newBoard,rows,cols);
@@ -565,24 +574,17 @@ int main(int argc, char *argv[]) {
    *
    *    
    */
-  // TODO determine if partition is letting threads
-  // read / modify unallocated memory
   partition(thread_args,numThreads,partitionType);
 
-  // TODO change from multiple threadspawns/joins to one
-  //
   int i, ret;
 
   // spawn threads
   for(i = 0; i<numThreads; i++) {
-     printf("Tid: %d startCol:%d, endcol:%d\n",thread_args[i].my_tid,
-         thread_args[i].startCol,thread_args[i].endCol);
+     /*printf("Tid: %d startCol:%d, endcol:%d\n",thread_args[i].my_tid,
+         thread_args[i].startCol,thread_args[i].endCol);*/
      
      thread_args[i].willPrint = printPartition;
      thread_args[i].iter = iters;
-     //TODO somewhere between the pthread_create and the resulting evolve
-     //call, the value of the elements in thread_args[i] get changed. I
-     //think it's a synchronicity issue.
      ret = pthread_create(&tids[i],0,evolve,(void *)&thread_args[i]);
      if(ret){
        perror("Error pthread_create\n");
@@ -592,10 +594,6 @@ int main(int argc, char *argv[]) {
      thread_args[i].willPrint = printPartition;
      thread_args[i].iter = iters;
      thread_args[i].my_tid = i;
-     //thread_args[i].startRow = startRow;
-     //thread_args[i].endRow = endRow;
-     //thread_args[i].startCol = 0;
-     //thread_args[i].endCol = cols-1;
      ret = pthread_create(&tids[i],0,update,(void *)&thread_args[i]);
      if(ret){
        perror("Error pthread_create\n");
